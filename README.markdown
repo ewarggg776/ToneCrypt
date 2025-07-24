@@ -47,7 +47,7 @@
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/tonecrypt.git
+   git clone https://github.com/ewarggg776/tonecrypt.git
    cd tonecrypt
    ```
 
@@ -161,7 +161,7 @@ Contributions are welcome! To contribute:
 4. Push to the branch (`git push origin feature/your-feature`).
 5. Open a Pull Request.
 
-Please report issues or suggest improvements via the [Issues](https://github.com/yourusername/tonecrypt/issues) page.
+Please report issues or suggest improvements via the [Issues](https://github.com/ewarggg776/tonecrypt/issues) page.
 
 ---
 
