@@ -21,7 +21,7 @@
 
 ## Installation
 
-### Option 1: Install via `.deb` Package (Recommended for Raspberry Pi OS)
+### Option 1: Install via `.deb` Package (Coming Soon)
 
 1. **Download the Package**:
    Download `tonecrypt_1.3-1.deb` from the [Releases](https://github.com/yourusername/tonecrypt/releases) page.
