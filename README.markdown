@@ -64,7 +64,7 @@
 
 4. **Run Directly**:
    ```bash
-   python3 tonecrypt.py
+   python3 ToneCrypt.py
    ```
 
 ---
