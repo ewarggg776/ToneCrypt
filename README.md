@@ -23,7 +23,7 @@
 ### Option 1: Install via `.deb` Package 
 
 1. **Download the Package**:
-   Download `tonecrypt_1.3-1.deb` from the [Releases](https://github.com/yourusername/tonecrypt/releases) page.
+   Download `tonecrypt_1.3-1.deb` from the [Releases](https://github.com/ewarggg776/ToneCrypt/releases/tag/Releases) page.
 
 2. **Install System Dependencies**:
    ```bash
