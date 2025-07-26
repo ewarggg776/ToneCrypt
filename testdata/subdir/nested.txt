@@ -1,2 +1,0 @@
-Nested file content.
-Another line.

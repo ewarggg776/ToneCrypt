@@ -10,8 +10,8 @@
 
 ## Features
 
-- **Audio-Based Encryption**: Convert folders to WAV files with customizable pitch shifts and noise levels.
-- **Flexible Decryption**: Decrypt from WAV files, microphone input, or CD audio.
+- **Audio-Based Encryption**: Convert folders or .zip files to WAV files with customizable pitch shifts and noise levels.
+- **Flexible Decryption**: Decrypt from WAV files, microphone input, or CD audio. Supports restoring folders or .zip files.
 - **Secure Key Derivation**: Uses SHA-256 to derive encryption parameters from a user-provided key.
 - **Error Correction**: Implements Reed-Solomon encoding for reliable data recovery.
 - **Interactive & CLI Modes**: Supports both interactive prompts and command-line arguments.
@@ -71,7 +71,6 @@
 
 ## Usage
 
-
 ### Interactive Mode (with Color & Verbosity)
 Run `python3 ToneCrypt.py` (or the installed `/usr/local/bin/ToneCrypt.py`) with no arguments to enter interactive mode:
 ```bash
@@ -81,13 +80,19 @@ Features:
 - Colorful, user-friendly prompts
 - Toggle verbose/debug output with `V` at the menu
 - Choose encrypt or decrypt, and follow the prompts
-
+- Supports both folders and `.zip` files for encryption and decryption
 
 ### Command-Line Mode
 You can also use command-line arguments:
 ```bash
+# Encrypt a folder:
 python3 ToneCrypt.py --mode encrypt --input my_folder --output encrypted.wav --key mysecret --noise 0.1
+# Encrypt a .zip file:
+python3 ToneCrypt.py --mode encrypt --input my_archive.zip --output encrypted.wav --key mysecret
+# Decrypt to a folder:
 python3 ToneCrypt.py --mode decrypt --input encrypted.wav --output restored_folder --key mysecret
+# Decrypt to a .zip file:
+python3 ToneCrypt.py --mode decrypt --input encrypted.wav --output restored.zip --key mysecret
 ```
 
 ### Examples
@@ -96,17 +101,30 @@ python3 ToneCrypt.py --mode decrypt --input encrypted.wav --output restored_fold
    mkdir -p test_folder/subdir
    echo "Hello" > test_folder/test.txt
    echo "World" > test_folder/subdir/subtest.txt
-   tonecrypt encrypt --folder test_folder --key mysecret
+   python3 ToneCrypt.py --mode encrypt --input test_folder --output encrypted.wav --key mysecret
    ```
 
-2. **Decrypt a WAV File**:
+2. **Encrypt a .zip File**:
    ```bash
-   tonecrypt decrypt --input encrypted.wav --segment-length 123456 --tone-length 66150
+   zip -r mydata.zip test_folder
+   python3 ToneCrypt.py --mode encrypt --input mydata.zip --output encrypted.wav --key mysecret
    ```
 
-3. **Decrypt from Microphone**:
+3. **Decrypt to a Folder**:
    ```bash
-   tonecrypt
+   python3 ToneCrypt.py --mode decrypt --input encrypted.wav --output restored_folder --key mysecret
+   ```
+
+4. **Decrypt to a .zip File**:
+   ```bash
+   python3 ToneCrypt.py --mode decrypt --input encrypted.wav --output restored.zip --key mysecret
+   # Then unzip restored.zip
+   unzip restored.zip -d restored_folder
+   ```
+
+5. **Decrypt from Microphone**:
+   ```bash
+   python3 ToneCrypt.py
    ```
    Choose `decrypt`, select `mic`, and follow prompts.
 

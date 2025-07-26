@@ -122,62 +122,104 @@ def binary_to_folder(binary_data, output_folder):
 def encode_binary_to_wav(binary_data, output_path, key, noise_level=0.1, num_tones=4, segment_length=1024, tone_length=256):
     """Encode binary data into a WAV file using multiple tones."""
     logger.info(f"Encoding binary to WAV with {num_tones} tones...")
-    rsc = RSCodec(10)  # Reed-Solomon error correction
-    # Encode and get bytes
+    # Specify which tone indices are reserved for noise (e.g., last one by default)
+    noise_tones = [num_tones - 1]  # You can customize this list
+    data_tones = [i for i in range(num_tones) if i not in noise_tones]
+    rsc = RSCodec(32)  # Increased Reed-Solomon error correction
     encoded_bytes = rsc.encode(binary_data)
     if logger.isEnabledFor(logging.DEBUG):
         with open('original_encoded_bytes.bin', 'wb') as f:
             f.write(encoded_bytes[:128])
         logger.debug(f"First 64 bytes of encoded_bytes: {list(encoded_bytes[:64])}")
     # Convert bytes to bit string
+    bits_per_tone = int(np.log2(len(data_tones)))
     bit_str = ''.join(f'{byte:08b}' for byte in encoded_bytes)
-
-    # Group bits according to number of tones (e.g., 2 bits per tone for 4 tones)
-    bits_per_tone = int(np.log2(num_tones))
+    # Map bits to data_tones only
     tone_indices = []
     for i in range(0, len(bit_str), bits_per_tone):
         group = bit_str[i:i+bits_per_tone]
         if len(group) < bits_per_tone:
-            group = group.ljust(bits_per_tone, '0')  # pad last group
-        tone_indices.append(int(group, 2))
-
-    # Generate key-based seed for reproducibility
-    key_hash = hashlib.sha256(key.encode()).digest()
-    np.random.seed(int.from_bytes(key_hash[:4], 'big'))
-
+            group = group.ljust(bits_per_tone, '0')
+        idx = int(group, 2)
+        if idx >= len(data_tones):
+            idx = 0
+        tone_indices.append(data_tones[idx])
+    # Header: first segment encodes noise_tones as a binary mask
+    header = np.zeros(segment_length)
     sample_rate = 44100
-    duration = tone_length / sample_rate
     frequencies = np.linspace(1000, 5000, num_tones)
-    audio_signal = np.zeros(len(tone_indices) * segment_length)
-
+    t_vec = np.arange(tone_length) / sample_rate
+    # Vectorized header generation
+    for t in noise_tones:
+        header[:tone_length] += 0.5 * np.sin(2 * np.pi * frequencies[t] * t_vec)
+    # Main encoding: vectorized segment generation
+    n_segments = len(tone_indices)
+    audio_signal = np.zeros((n_segments + 1) * segment_length)
+    audio_signal[:segment_length] = header
+    # Precompute all tone segments
+    tone_segments = 0.5 * np.sin(2 * np.pi * frequencies[:, None] * t_vec)
     for i, tone_idx in enumerate(tone_indices):
         segment = np.zeros(segment_length)
-        for j in range(tone_length):
-            t = j / sample_rate
-            segment[j] += 0.5 * np.sin(2 * np.pi * frequencies[tone_idx] * t)
-        audio_signal[i * segment_length:(i + 1) * segment_length] = segment
-        if logger.isEnabledFor(logging.DEBUG) and (i % 10 == 0 or i == len(tone_indices) - 1):
-            logger.debug(f"Encoded {i+1}/{len(tone_indices)} segments...")
-
-    # Apply pre-emphasis filter
+        segment[:tone_length] = tone_segments[tone_idx]
+        audio_signal[(i+1) * segment_length:(i+2) * segment_length] = segment
+        if logger.isEnabledFor(logging.DEBUG) and (i % 100 == 0 or i == n_segments - 1):
+            logger.debug(f"Encoded {i+1}/{n_segments} segments...")
     audio_signal = pre_emphasis(audio_signal, coef=0.97)
-
-    # Save clean signal for reference (not written to file)
-    clean_signal = np.copy(audio_signal)
-
-    # Add noise after main signal is generated
     if noise_level > 0:
-        noise = np.random.normal(0, noise_level, len(audio_signal))
-        audio_signal += noise
+        audio_signal += np.random.normal(0, noise_level, len(audio_signal))
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f"Noise added with std={noise_level}")
-
-    # Normalize
     audio_signal = audio_signal / np.max(np.abs(audio_signal))
-
-    # Save to WAV
     sf.write(output_path, audio_signal, sample_rate)
     logger.info(f"Encryption complete. WAV file saved at {output_path}")
+    # If in verbose/debug mode, show the waveform graph
+    if logger.isEnabledFor(logging.DEBUG):
+        # ASCII waveform for first second (44100 samples), with / and \ connecting dots
+        try:
+            samples = audio_signal[:min(44100, len(audio_signal))]
+            width = 80
+            height = 16
+            min_val, max_val = np.min(samples), np.max(samples)
+            scale = (max_val - min_val) if (max_val - min_val) != 0 else 1
+            points = []
+            for x in range(width):
+                idx = int(x * len(samples) / width)
+                val = samples[idx]
+                y = int((val - min_val) / scale * (height - 1))
+                points.append(y)
+            # Draw lines between points for a connected waveform
+            rows = [[' ' for _ in range(width)] for _ in range(height)]
+            for x in range(width):
+                y = points[x]
+                if x == 0:
+                    rows[height - 1 - y][x] = '*'
+                else:
+                    prev_y = points[x-1]
+                    if y == prev_y:
+                        rows[height - 1 - y][x] = '-'
+                    else:
+                        # Draw vertical or diagonal connection
+                        step = 1 if y > prev_y else -1
+                        for interp_y in range(prev_y, y + step, step):
+                            if interp_y == y:
+                                # End point
+                                if y > prev_y:
+                                    rows[height - 1 - interp_y][x] = '\\'
+                                else:
+                                    rows[height - 1 - interp_y][x] = '/'
+                            elif interp_y == prev_y:
+                                # Start point
+                                continue
+                            else:
+                                rows[height - 1 - interp_y][x] = '|'
+            logger.info('ASCII waveform (first second):')
+            for row in rows:
+                logger.info(''.join(row))
+            logger.info('ASCII waveform (first second):')
+            for row in rows:
+                logger.info(row)
+        except Exception as e:
+            logger.warning(f"Could not display ASCII waveform: {e}")
 
 def decode_wav_to_binary(wav_path, key, num_tones=4, segment_length=1024, tone_length=256):
     """Decode a WAV file back to binary data using multiple tones."""
@@ -185,9 +227,29 @@ def decode_wav_to_binary(wav_path, key, num_tones=4, segment_length=1024, tone_l
     # Generate key-based seed for reproducibility
     key_hash = hashlib.sha256(key.encode()).digest()
     np.random.seed(int.from_bytes(key_hash[:4], 'big'))
+    # Use 8 tones and increased RS redundancy by default
+    num_tones = 8
+    rsc = RSCodec(32)
     sample_rate = 44100
     frequencies = np.linspace(1000, 5000, num_tones)
     audio_signal, _ = librosa.load(wav_path, sr=sample_rate)
+    # Read header to determine noise_tones
+    header = audio_signal[:segment_length]
+    detected_noise_tones = []
+    for t in range(num_tones):
+        # FFT energy in the header for each tone
+        segment = header[:tone_length]
+        fft = np.fft.fft(segment)
+        mag = np.abs(fft)
+        freqs = np.fft.fftfreq(tone_length, 1/sample_rate)
+        tone_freq = frequencies[t]
+        idx = np.argmin(np.abs(freqs - tone_freq))
+        if mag[idx] > 5:  # Threshold for presence
+            detected_noise_tones.append(t)
+    data_tones = [i for i in range(num_tones) if i not in detected_noise_tones]
+    bits_per_tone = int(np.log2(len(data_tones)))
+    # Remove header from audio_signal
+    audio_signal = audio_signal[segment_length:]
     # Attempt to remove noise by smoothing (simple low-pass filter)
     if np.std(audio_signal) > 0.15:  # Heuristic: if noisy, smooth
         audio_signal = scipy.signal.medfilt(audio_signal, kernel_size=5)
@@ -201,7 +263,6 @@ def decode_wav_to_binary(wav_path, key, num_tones=4, segment_length=1024, tone_l
             x[n] = coef * x[n-1] + y[n]
         return x
     audio_signal = de_emphasis(audio_signal, coef=0.97)
-    bits_per_tone = int(np.log2(num_tones))
     tone_indices = []
     debug_freqs = []
     for i in range(0, len(audio_signal), segment_length):
@@ -211,7 +272,6 @@ def decode_wav_to_binary(wav_path, key, num_tones=4, segment_length=1024, tone_l
         fft = np.fft.fft(segment)
         mag = np.abs(fft)
         freqs = np.fft.fftfreq(tone_length, 1/sample_rate)
-        # Find all peaks in the magnitude spectrum
         peaks, _ = scipy.signal.find_peaks(mag, height=np.max(mag)*0.5)
         if len(peaks) == 0:
             idx = np.argmax(mag)
@@ -219,12 +279,15 @@ def decode_wav_to_binary(wav_path, key, num_tones=4, segment_length=1024, tone_l
             idx = peaks[np.argmax(mag[peaks])]
         freq = abs(freqs[idx])
         debug_freqs.append(freq)
-        # Average over a small window around the peak for robustness
         window = mag[max(0, idx-2):min(len(mag), idx+3)]
         avg_idx = np.argmax(window) + max(0, idx-2)
         freq = abs(freqs[avg_idx])
         tone_idx = int(np.argmin(np.abs(frequencies - freq)))
-        tone_indices.append(tone_idx)
+        if tone_idx in data_tones:
+            tone_indices.append(data_tones.index(tone_idx))
+        # else: skip, as it's a noise tone
+    # Convert tone indices to bit string using only data_tones
+    bit_str = ''.join(f'{idx:0{bits_per_tone}b}' for idx in tone_indices)
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(f"First 20 detected frequencies: {debug_freqs[:20]}")
     # Convert tone indices to bit string
@@ -242,7 +305,6 @@ def decode_wav_to_binary(wav_path, key, num_tones=4, segment_length=1024, tone_l
         logger.debug(f"First 16 bytes: {list(byte_data[:16])}")
     # Try to decode with Reed-Solomon, and fallback to partial recovery if possible
     try:
-        rsc = RSCodec(10)
         decoded = rsc.decode(byte_data)
         # reedsolo.decode may return (decoded_bytes, ecc) tuple
         if isinstance(decoded, tuple):
@@ -273,7 +335,6 @@ def decode_wav_to_binary(wav_path, key, num_tones=4, segment_length=1024, tone_l
         except Exception as e2:
             logger.error(f"Partial recovery failed: {e2}")
     try:
-        rsc = RSCodec(10)
         decoded = rsc.decode(byte_data)
         # reedsolo.decode may return (decoded_bytes, ecc) tuple
         if isinstance(decoded, tuple):
@@ -309,13 +370,19 @@ def decode_wav_to_binary(wav_path, key, num_tones=4, segment_length=1024, tone_l
 
 def encrypt_folder(folder_path, output_path, storage_path, key, noise_level):
     """Encrypt a folder into a WAV file."""
-    binary_data = folder_to_binary(folder_path)
+    # If input is a .zip file, read as bytes; else, treat as folder
+    if folder_path.lower().endswith('.zip') and os.path.isfile(folder_path):
+        logger.info(f"Encrypting .zip file: {folder_path}")
+        with open(folder_path, 'rb') as f:
+            binary_data = f.read()
+    else:
+        binary_data = folder_to_binary(folder_path)
     if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"First 128 bytes of folder_to_binary: {binary_data[:128]}")
-        logger.debug(f"Length of folder_to_binary output: {len(binary_data)} bytes")
-        with open('step1_folder_to_binary.bin', 'wb') as f:
+        logger.debug(f"First 128 bytes of input: {binary_data[:128]}")
+        logger.debug(f"Length of input: {len(binary_data)} bytes")
+        with open('step1_input_bytes.bin', 'wb') as f:
             f.write(binary_data[:1024])
-    encode_binary_to_wav(binary_data, output_path, key, noise_level)
+    encode_binary_to_wav(binary_data, output_path, key, noise_level, num_tones=8)
     os.makedirs(storage_path, exist_ok=True)
     logger.info(f"Storage saved at {storage_path}")
     logger.info(f"Decryption parameters: segment-length=1024, tone-length=256, num-tones=4")
@@ -337,70 +404,236 @@ def main():
 
     # Interactive mode if --mode is not provided
     if not args.mode:
-        from colorama import Fore, Style
-        print(f"\n{Fore.CYAN}{Style.BRIGHT}=== ToneCrypt Interactive Mode ==={Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}1){Style.RESET_ALL} {Fore.GREEN}Encrypt a folder to WAV (default){Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}2){Style.RESET_ALL} {Fore.MAGENTA}Decrypt a WAV file to folder{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}V){Style.RESET_ALL} {Fore.BLUE}Toggle Verbose Mode{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}Q){Style.RESET_ALL} Quit{Style.RESET_ALL}")
+        import curses
+        from curses import wrapper
+        menu_items = [
+            ("Encrypt a folder to WAV (default)", "encrypt"),
+            ("Decrypt a WAV file to folder", "decrypt"),
+            ("Toggle Verbose Mode", "verbose"),
+            ("Quit", "quit")
+        ]
         verbose_mode = False
-        while True:
-            choice = input(f"{Fore.CYAN}Select an option [{Fore.YELLOW}1{Fore.CYAN}]: {Style.RESET_ALL}").strip().lower()
-            if choice in ('', '1', 'encrypt'):
-                args.mode = 'encrypt'
-                break
-            elif choice in ('2', 'decrypt'):
-                args.mode = 'decrypt'
-                break
-            elif choice == 'v':
-                verbose_mode = not verbose_mode
-                if verbose_mode:
-                    logger.setLevel(logging.DEBUG)
-                    print(f"{Fore.BLUE}Verbose mode enabled.{Style.RESET_ALL}")
-                else:
-                    logger.setLevel(logging.INFO)
-                    print(f"{Fore.BLUE}Verbose mode disabled.{Style.RESET_ALL}")
-            elif choice == 'q':
-                print(f"{Fore.RED}Exiting.{Style.RESET_ALL}")
-                sys.exit(0)
-            else:
-                print(f"{Fore.RED}Invalid option. Please choose 1, 2, V, or Q.{Style.RESET_ALL}")
-
-        def prompt(msg, default=None, required=False, color=Fore.WHITE):
+        def curses_menu(stdscr):
+            import time
+            curses.curs_set(0)  # Hide terminal cursor, use our own
+            curses.start_color()
+            has_256 = False
+            try:
+                if curses.COLORS >= 16:
+                    has_256 = True
+            except Exception:
+                pass
+            GREY = 8 if has_256 else curses.COLOR_WHITE
+            curses.init_pair(10, curses.COLOR_BLACK, GREY)
+            stdscr.bkgd(' ', curses.color_pair(10))
+            curses.init_pair(1, curses.COLOR_WHITE, GREY)
+            curses.init_pair(2, curses.COLOR_GREEN, GREY)
+            curses.init_pair(3, curses.COLOR_RED, GREY)
+            curses.init_pair(4, curses.COLOR_BLUE, GREY)
+            curses.init_pair(5, curses.COLOR_RED, GREY)
+            curses.init_pair(6, curses.COLOR_YELLOW, GREY)
+            curses.init_pair(7, curses.COLOR_BLACK, curses.COLOR_YELLOW)  # For input field
+            curses.init_pair(8, curses.COLOR_CYAN, GREY)  # For help text
+            current_row = 0
+            nonlocal verbose_mode
+            blink = True
+            last_blink = time.time()
+            blink_interval = 0.5
+            help_lines = [
+                "Use UP/DOWN arrows to move, ENTER to select, ESC to quit.",
+                "Home/End: jump to first/last. Toggle Verbose for debug info."
+            ]
             while True:
-                val = input(f"{color}{msg}{Style.RESET_ALL}{' [' + str(default) + ']' if default is not None else ''}: ").strip()
-                if val:
-                    return val
-                elif default is not None:
-                    return default
-                elif required:
-                    print(f"{Fore.RED}This field is required.{Style.RESET_ALL}")
-                else:
-                    return ''
-
-        if args.mode == 'encrypt':
-            args.input = args.input or prompt("Enter input folder to encrypt", required=True, color=Fore.YELLOW)
-            args.output = prompt("Enter output WAV file", args.output, color=Fore.YELLOW)
-            args.storage = prompt("Enter storage path", args.storage, color=Fore.YELLOW)
-            args.key = prompt("Enter encryption key", args.key, color=Fore.YELLOW)
-            while True:
-                noise = prompt("Enter noise level (0.0-1.0)", str(args.noise), color=Fore.YELLOW)
-                try:
-                    args.noise = float(noise)
-                    if 0.0 <= args.noise <= 1.0:
-                        break
+                stdscr.erase()
+                h, w = stdscr.getmaxyx()
+                min_h = 14
+                min_w = 60
+                if h < min_h or w < min_w:
+                    stdscr.addstr(0, 0, "Terminal too small! Resize, then press any key.", curses.color_pair(5) | curses.A_BOLD)
+                    stdscr.refresh()
+                    stdscr.getch()
+                    continue
+                title = "=== ToneCrypt Interactive Mode ==="
+                stdscr.attron(curses.color_pair(1) | curses.A_BOLD)
+                stdscr.addstr(1, w//2 - len(title)//2, title)
+                stdscr.attroff(curses.color_pair(1) | curses.A_BOLD)
+                menu_x = w//2 - 25
+                menu_y = h//2 - len(menu_items)
+                for idx, (label, _) in enumerate(menu_items):
+                    x = menu_x
+                    y = menu_y + idx * 2
+                    if idx == 0:
+                        color = curses.color_pair(2)
+                    elif idx == 1:
+                        color = curses.color_pair(3)
+                    elif idx == 2:
+                        color = curses.color_pair(4)
+                    elif idx == 3:
+                        color = curses.color_pair(5)
+                    if idx == current_row:
+                        # Animated blinking arrow
+                        if blink:
+                            stdscr.attron(curses.color_pair(1) | curses.A_REVERSE | curses.A_BOLD)
+                            stdscr.addstr(y, x, f" 7 {label} 1 ")
+                            stdscr.attroff(curses.color_pair(1) | curses.A_REVERSE | curses.A_BOLD)
+                        else:
+                            stdscr.attron(curses.color_pair(1) | curses.A_REVERSE)
+                            stdscr.addstr(y, x, f"   {label}   ")
+                            stdscr.attroff(curses.color_pair(1) | curses.A_REVERSE)
                     else:
-                        print(f"{Fore.RED}Noise level must be between 0.0 and 1.0.{Style.RESET_ALL}")
-                except ValueError:
-                    print(f"{Fore.RED}Invalid noise level, please enter a number between 0.0 and 1.0.{Style.RESET_ALL}")
-        elif args.mode == 'decrypt':
-            args.input = args.input or prompt("Enter input WAV file to decrypt", required=True, color=Fore.MAGENTA)
-            args.output = prompt("Enter output folder for restored files", args.output, color=Fore.MAGENTA)
-            args.key = prompt("Enter decryption key", args.key, color=Fore.MAGENTA)
+                        stdscr.attron(color)
+                        stdscr.addstr(y, x, f"   {label}   ")
+                        stdscr.attroff(color)
+                # Show verbose mode status
+                vstat = "ON" if verbose_mode else "OFF"
+                stdscr.addstr(h-5, 2, f"Verbose Mode: {vstat}", curses.color_pair(4) if verbose_mode else curses.color_pair(6))
+                # Help panel
+                for i, line in enumerate(help_lines):
+                    stdscr.addstr(h-3+i, 2, line, curses.color_pair(8) | curses.A_DIM)
+                stdscr.refresh()
+                # Blinking effect
+                now = time.time()
+                if now - last_blink > blink_interval:
+                    blink = not blink
+                    last_blink = now
+                # Non-blocking input with timeout for animation
+                stdscr.timeout(100)
+                key = stdscr.getch()
+                if key == -1:
+                    continue
+                if key in (curses.KEY_UP, ord('k')):
+                    current_row = (current_row - 1) % len(menu_items)
+                elif key in (curses.KEY_DOWN, ord('j')):
+                    current_row = (current_row + 1) % len(menu_items)
+                elif key in (curses.KEY_HOME, 262):
+                    current_row = 0
+                elif key in (curses.KEY_END, 360):
+                    current_row = len(menu_items) - 1
+                elif key in (27,):  # ESC
+                    stdscr.clear()
+                    stdscr.addstr(h//2, w//2 - 5, "Exiting...", curses.color_pair(5))
+                    stdscr.refresh()
+                    curses.napms(800)
+                    sys.exit(0)
+                elif key in (curses.KEY_ENTER, 10, 13):
+                    label, action = menu_items[current_row]
+                    if action == "encrypt":
+                        return "encrypt"
+                    elif action == "decrypt":
+                        return "decrypt"
+                    elif action == "verbose":
+                        verbose_mode = not verbose_mode
+                        if verbose_mode:
+                            logger.setLevel(logging.DEBUG)
+                        else:
+                            logger.setLevel(logging.INFO)
+                    elif action == "quit":
+                        stdscr.clear()
+                        stdscr.addstr(h//2, w//2 - 5, "Exiting...", curses.color_pair(5))
+                        stdscr.refresh()
+                        curses.napms(800)
+                        sys.exit(0)
+        # Prompt for input in curses
+        def curses_prompt(stdscr, msg, default=None, required=False, color_pair=2):
+            h, w = stdscr.getmaxyx()
+            inp = ''
+            error = ''
+            cursor = 0
+            while True:
+                stdscr.clear()
+                stdscr.attron(curses.color_pair(color_pair) | curses.A_BOLD)
+                stdscr.addstr(h//2, w//2 - len(msg)//2, msg)
+                stdscr.attroff(curses.color_pair(color_pair) | curses.A_BOLD)
+                if default is not None:
+                    stdscr.addstr(h//2+1, w//2 - 10, f"[Default: {default}]", curses.color_pair(8))
+                # Input field with highlight
+                field_x = w//2 - 20
+                stdscr.attron(curses.color_pair(7))
+                stdscr.addstr(h//2+2, field_x, ' ' * 40)
+                stdscr.attroff(curses.color_pair(7))
+                stdscr.attron(curses.color_pair(7) | curses.A_BOLD)
+                stdscr.addstr(h//2+2, field_x, inp + ' ' * (40 - len(inp)))
+                stdscr.attroff(curses.color_pair(7) | curses.A_BOLD)
+                # Show blinking cursor
+                stdscr.move(h//2+2, field_x + cursor)
+                stdscr.refresh()
+                # Error message
+                if error:
+                    stdscr.addstr(h//2+4, w//2 - len(error)//2, error, curses.color_pair(6) | curses.A_BOLD)
+                key = stdscr.getch()
+                if key in (curses.KEY_ENTER, 10, 13):
+                    val = inp.strip()
+                    if val:
+                        return val
+                    elif default is not None:
+                        return default
+                    elif required:
+                        error = "This field is required!"
+                        continue
+                    else:
+                        return ''
+                elif key in (27,):  # ESC
+                    return ''
+                elif key in (curses.KEY_LEFT, 260):
+                    cursor = max(0, cursor - 1)
+                elif key in (curses.KEY_RIGHT, 261):
+                    cursor = min(len(inp), cursor + 1)
+                elif key in (curses.KEY_BACKSPACE, 127, 8):
+                    if cursor > 0:
+                        inp = inp[:cursor-1] + inp[cursor:]
+                        cursor -= 1
+                elif key == curses.KEY_DC:
+                    if cursor < len(inp):
+                        inp = inp[:cursor] + inp[cursor+1:]
+                elif 32 <= key <= 126:
+                    if len(inp) < 40:
+                        inp = inp[:cursor] + chr(key) + inp[cursor:]
+                        cursor += 1
+                else:
+                    pass
+        # Run menu
+        mode = wrapper(curses_menu)
+        # Prompt for parameters
+        def run_curses_prompts(mode):
+            return wrapper(lambda stdscr: _curses_prompts(stdscr, mode))
+        def _curses_prompts(stdscr, mode):
+            if mode == 'encrypt':
+                args_input = curses_prompt(stdscr, "Enter input folder to encrypt", required=True, color_pair=3)
+                args_output = curses_prompt(stdscr, "Enter output WAV file", "encrypted.wav", color_pair=3)
+                args_storage = curses_prompt(stdscr, "Enter storage path", "storage", color_pair=3)
+                args_key = curses_prompt(stdscr, "Enter encryption key", "default_key", color_pair=3)
+                while True:
+                    noise = curses_prompt(stdscr, "Enter noise level (0.0-1.0)", str(args.noise), color_pair=3)
+                    try:
+                        args_noise = float(noise)
+                        if 0.0 <= args_noise <= 1.0:
+                            break
+                        else:
+                            stdscr.addstr(2, 2, "Noise level must be between 0.0 and 1.0!", curses.color_pair(6))
+                            stdscr.refresh()
+                            curses.napms(1000)
+                    except ValueError:
+                        stdscr.addstr(2, 2, "Invalid noise level!", curses.color_pair(6))
+                        stdscr.refresh()
+                        curses.napms(1000)
+                return {'input': args_input, 'output': args_output, 'storage': args_storage, 'key': args_key, 'noise': args_noise, 'mode': 'encrypt'}
+            elif mode == 'decrypt':
+                args_input = curses_prompt(stdscr, "Enter input WAV file to decrypt", required=True, color_pair=4)
+                args_output = curses_prompt(stdscr, "Enter output folder for restored files", "decrypted", color_pair=4)
+                args_key = curses_prompt(stdscr, "Enter decryption key", "default_key", color_pair=4)
+                return {'input': args_input, 'output': args_output, 'key': args_key, 'mode': 'decrypt'}
+        params = run_curses_prompts(mode)
+        args.input = params.get('input', args.input)
+        args.output = params.get('output', args.output)
+        args.storage = params.get('storage', args.storage)
+        args.key = params.get('key', args.key)
+        args.noise = params.get('noise', args.noise)
+        args.mode = params['mode']
 
     if args.mode == 'encrypt':
-        if not args.input or not os.path.isdir(args.input):
-            logger.error(f"Input folder {args.input} does not exist")
+        # Accept .zip file or folder as input
+        if not args.input or (not os.path.isdir(args.input) and not (args.input.lower().endswith('.zip') and os.path.isfile(args.input))):
+            logger.error(f"Input folder or .zip file {args.input} does not exist")
             sys.exit(1)
         encrypt_folder(args.input, args.output, args.storage, args.key, args.noise)
     elif args.mode == 'decrypt':
@@ -411,14 +644,23 @@ def main():
         if not binary_data:
             logger.error("Decryption failed: could not recover valid data from audio. See _recovered_bits.bin for raw output.")
             sys.exit(1)
-        # If the data is bytes, skip binary string check and pass directly
-        if isinstance(binary_data, (bytes, bytearray)):
-            binary_to_folder(binary_data, args.output)
+        # If output ends with .zip, write bytes directly as a zip file
+        if args.output.lower().endswith('.zip'):
+            if not isinstance(binary_data, (bytes, bytearray)):
+                logger.error("Decoded data is not bytes; cannot write .zip file.")
+                sys.exit(1)
+            with open(args.output, 'wb') as f:
+                f.write(binary_data)
+            logger.info(f"Decrypted .zip file written to {args.output}")
         else:
-            # If the data is a string, check if it's a valid binary string
-            if not all(c in '01' for c in binary_data[:64]):
-                logger.warning("Recovered data does not appear to be a valid binary string. Manual inspection may be required.")
-            binary_to_folder(binary_data, args.output)
+            # If the data is bytes, treat as folder archive
+            if isinstance(binary_data, (bytes, bytearray)):
+                binary_to_folder(binary_data, args.output)
+            else:
+                # If the data is a string, check if it's a valid binary string
+                if not all(c in '01' for c in binary_data[:64]):
+                    logger.warning("Recovered data does not appear to be a valid binary string. Manual inspection may be required.")
+                binary_to_folder(binary_data, args.output)
     else:
         logger.error("Unknown mode")
         sys.exit(1)

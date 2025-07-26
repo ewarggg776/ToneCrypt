@@ -1,0 +1,3 @@
+#!/bin/bash
+# Simple wrapper to run ToneCrypt.py as 'tonecrypt'
+exec python3 /workspaces/ToneCrypt/ToneCrypt.py "$@"
