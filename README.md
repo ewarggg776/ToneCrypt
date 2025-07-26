@@ -20,10 +20,11 @@
 
 ## Installation
 
-### Option 1: Install via `.deb` Package 
+### Option 1: Install via `.deb` Package
 
-1. **Download the Package**:
-   Download `tonecrypt_1.3-1.deb` from the [Releases](https://github.com/ewarggg776/ToneCrypt/releases/tag/Releases) page.
+1. **Build or Download the Package**:
+   - To build: see the section below on building the `.deb` package.
+   - Or download `tonecrypt_1.0-1.deb` from the [Releases](https://github.com/ewarggg776/tonecrypt/releases) page.
 
 2. **Install System Dependencies**:
    ```bash
@@ -33,14 +34,14 @@
 
 3. **Install the Package**:
    ```bash
-   sudo apt install ./tonecrypt_1.3-1.deb
+   sudo dpkg -i tonecrypt_1.0-1.deb
    ```
 
-4. **Verify Installation**:
+4. **Run ToneCrypt**:
    ```bash
-   tonecrypt --version
+   python3 /usr/local/bin/ToneCrypt.py
    ```
-   Expected output: `ToneCrypt 1.3.1`
+   (Or add a symlink to your PATH for convenience.)
 
 ### Option 2: Install as a Python Package
 
@@ -70,33 +71,24 @@
 
 ## Usage
 
-### Interactive Mode
-Run `tonecrypt` without arguments to enter interactive mode:
+
+### Interactive Mode (with Color & Verbosity)
+Run `python3 ToneCrypt.py` (or the installed `/usr/local/bin/ToneCrypt.py`) with no arguments to enter interactive mode:
 ```bash
-tonecrypt
+python3 ToneCrypt.py
 ```
-Follow the prompts to encrypt or decrypt a folder. Example:
-```
-Welcome to ToneCrypt v1.3.1: Audio-based folder encryption tool
-Choose mode (encrypt/decrypt): encrypt
-Enter folder path to encrypt: /home/user/test_folder
-Enter output file path (default: encrypted.wav): encrypted.wav
-Enter storage path (default: storage/encrypted.wav): /home/user/Music/tonecrypt
-Enter encryption key (or press Enter for defaults): mysecret
-Enter noise level (0.0-1.0, default: 0.1): 0.5
-```
+Features:
+- Colorful, user-friendly prompts
+- Toggle verbose/debug output with `V` at the menu
+- Choose encrypt or decrypt, and follow the prompts
+
 
 ### Command-Line Mode
-- **Encrypt a Folder**:
-  ```bash
-  tonecrypt encrypt --folder my_folder --key mysecret --output encrypted.wav --storage /path/to/storage --noise-level 0.5
-  ```
-  Note the `segment-length`, `tone-length`, and `num-tones` output for decryption.
-
-- **Decrypt a WAV File**:
-  ```bash
-  tonecrypt decrypt --input encrypted.wav --output restored_folder --segment-length 123456 --tone-length 66150 --num-tones 3
-  ```
+You can also use command-line arguments:
+```bash
+python3 ToneCrypt.py --mode encrypt --input my_folder --output encrypted.wav --key mysecret --noise 0.1
+python3 ToneCrypt.py --mode decrypt --input encrypted.wav --output restored_folder --key mysecret
+```
 
 ### Examples
 1. **Encrypt a Folder**:
@@ -120,14 +112,14 @@ Enter noise level (0.0-1.0, default: 0.1): 0.5
 
 ---
 
+
 ## Building the `.deb` Package
 
 To build the `.deb` package locally:
 ```bash
-cd tonecrypt
-./build-deb.sh
+dpkg-deb --build tonecrypt_1.0-1
 ```
-This creates `tonecrypt_1.3-1.deb` in the current directory. Install it as shown in the Installation section.
+This creates `tonecrypt_1.0-1.deb` in the current directory. Install it as shown above.
 
 ---
 
