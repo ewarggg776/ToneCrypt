@@ -1,7 +1,0 @@
-Package: tonecrypt
-Version: 0.1
-Section: utils
-Priority: optional
-Architecture: all
-Maintainer: Andrew <gilroyandrew6@proton.me>
-Description: ToneCrypt - Encrypt/decrypt files into audio tones

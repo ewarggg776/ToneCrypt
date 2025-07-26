@@ -1,0 +1,7 @@
+{
+    "python.testing.pytestArgs": [
+        "tonecrypt_1.3-1"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}

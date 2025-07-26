@@ -1,17 +1,8 @@
-<<<<<<< HEAD
-numpy==2.0.1
-scipy==1.7.3
-soundfile==0.12.1
-librosa==0.10.1
-reedsolo==1.7.0
-colorama==0.4.6
-pydub==0.25.1
-=======
+
 numpy
 scipy
-librosa
 soundfile
+librosa
 reedsolo
 colorama
 pydub
->>>>>>> f40e215 (Update maintainer info, add interactive mode, clean up, and improve usability)
