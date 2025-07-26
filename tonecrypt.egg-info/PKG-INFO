@@ -1,3 +1,15 @@
+Metadata-Version: 2.1
+Name: tonecrypt
+Version: 0.1
+Summary: A tool for encrypting files into audio tones
+Author: Ewarggg776
+Author-email: gilroyandrew6@gmail.com
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Operating System :: POSIX :: Linux
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
 # ToneCrypt
 
 ![Python](https://img.shields.io/badge/python-3.7+-blue.svg)
@@ -21,7 +33,7 @@
 
 ## Installation
 
-### Option 1: Install via `.deb` Package (Coming Soon)
+### Option 1: Install via `.deb` Package (Recommended for Raspberry Pi OS)
 
 1. **Download the Package**:
    Download `tonecrypt_1.3-1.deb` from the [Releases](https://github.com/yourusername/tonecrypt/releases) page.
@@ -64,7 +76,7 @@
 
 4. **Run Directly**:
    ```bash
-   python3 ToneCrypt.py
+   python3 tonecrypt.py
    ```
 
 ---

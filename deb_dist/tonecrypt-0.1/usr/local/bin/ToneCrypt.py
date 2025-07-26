@@ -85,7 +85,7 @@ def encrypt_folder(folder_path, output_path, storage_path, key, noise_level):
     encode_binary_to_wav(binary_data, output_path, key, noise_level)
     os.makedirs(storage_path, exist_ok=True)
     logger.info(f"Storage saved at {storage_path}")
-    logger.info(f"Decryption parameters: segment-length={1024}, tone-length={256}, num-tones=4")
+    logger.info(f"Decryption parameters: segment-length=1024, tone-length=256, num-tones=4")
 
 def main():
     parser = argparse.ArgumentParser(description="ToneCrypt: Encrypt/decrypt files into audio tones")

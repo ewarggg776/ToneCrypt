@@ -1,0 +1,9 @@
+LICENSE
+README.md
+ToneCrypt.py
+setup.py
+tonecrypt.egg-info/PKG-INFO
+tonecrypt.egg-info/SOURCES.txt
+tonecrypt.egg-info/dependency_links.txt
+tonecrypt.egg-info/requires.txt
+tonecrypt.egg-info/top_level.txt

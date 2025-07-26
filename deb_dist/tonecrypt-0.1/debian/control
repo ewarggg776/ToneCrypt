@@ -1,0 +1,33 @@
+Source: tonecrypt
+Maintainer: None <None>
+Section: python
+Priority: optional
+Build-Depends: dh-python, python3-setuptools, python3-all, debhelper (>= 9)
+Standards-Version: 3.9.6
+Homepage: None
+
+Package: python3-tonecrypt
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends}
+Description: A tool for encrypting files into audio tones
+ # ToneCrypt
+ .
+ ![Python](https://img.shields.io/badge/python-3.7+-blue.svg)
+ ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
+ ![Version](https://img.shields.io/badge/version-1.3.1-blue.svg)
+ .
+ **ToneCrypt** is a Python-based tool that encrypts folders into WAV audio files using pitch shifts, noise, and reverb, with tones encoding decryption keys via a nonlinear equation `[cos(f1/200)*f2^3 + log(f3+1)*exp(f2/500) + sin(f1/f3)]`. It supports decryption from audio files, microphone recordings, or CDs, with Reed-Solomon error correction for robust folder restoration. This project is licensed under the [GNU General Public License v3.0](LICENSE).
+ .
+ ---
+ .
+ ## Features
+ .
+ - **Audio-Based Encryption**: Convert folders to WAV files with customizable pitch shifts and noise levels.
+ - **Flexible Decryption**: Decrypt from WAV files, microphone input, or CD audio.
+ - **Secure Key Derivation**: Uses SHA-256 to derive encryption parameters from a user-provided key.
+ - **Error Correction**: Implements Reed-Solomon encoding for reliable data recovery.
+ - **Interactive & CLI Modes**: Supports both interactive prompts and command-line arguments.
+ - **Raspberry Pi Compatible**: Optimized for Raspberry Pi OS and other Linux distributions.
+ .
+ ---
+

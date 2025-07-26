@@ -88,8 +88,9 @@ def encrypt_folder(folder_path, output_path, storage_path, key, noise_level):
     logger.info(f"Decryption parameters: segment-length={1024}, tone-length={256}, num-tones=4")
 
 def main():
+
     parser = argparse.ArgumentParser(description="ToneCrypt: Encrypt/decrypt files into audio tones")
-    parser.add_argument('--mode', choices=['encrypt', 'decrypt'], required=True, help="Operation mode")
+    parser.add_argument('--mode', choices=['encrypt', 'decrypt'], help="Operation mode")
     parser.add_argument('--input', help="Input folder (encrypt) or WAV file (decrypt)")
     parser.add_argument('--output', default='encrypted.wav', help="Output WAV file (encrypt) or folder (decrypt)")
     parser.add_argument('--storage', default='storage', help="Storage path for encrypted data")
@@ -98,8 +99,56 @@ def main():
 
     args = parser.parse_args()
 
+    # Improved Interactive mode if --mode is not provided
+    if not args.mode:
+        print("\n=== ToneCrypt Interactive Mode ===")
+        print("1) Encrypt a folder to WAV (default)")
+        print("2) Decrypt a WAV file to folder (not implemented)")
+        print("q) Quit")
+        while True:
+            choice = input("Select an option [1]: ").strip().lower()
+            if choice in ('', '1', 'encrypt'):
+                args.mode = 'encrypt'
+                break
+            elif choice in ('2', 'decrypt'):
+                print("Decryption mode not implemented in this version.")
+                sys.exit(1)
+            elif choice == 'q':
+                print("Exiting.")
+                sys.exit(0)
+            else:
+                print("Invalid option. Please choose 1, 2, or q.")
+
+        # Prompt for encrypt options with defaults
+        def prompt(msg, default=None, required=False):
+            while True:
+                val = input(f"{msg}{' [' + str(default) + ']' if default is not None else ''}: ").strip()
+                if val:
+                    return val
+                elif default is not None:
+                    return default
+                elif required:
+                    print("This field is required.")
+                else:
+                    return ''
+
+        args.input = args.input or prompt("Enter input folder to encrypt", required=True)
+        args.output = prompt("Enter output WAV file", args.output)
+        args.storage = prompt("Enter storage path", args.storage)
+        args.key = prompt("Enter encryption key", args.key)
+        while True:
+            noise = prompt("Enter noise level (0.0-1.0)", str(args.noise))
+            try:
+                args.noise = float(noise)
+                if 0.0 <= args.noise <= 1.0:
+                    break
+                else:
+                    print("Noise level must be between 0.0 and 1.0.")
+            except ValueError:
+                print("Invalid noise level, please enter a number between 0.0 and 1.0.")
+
     if args.mode == 'encrypt':
-        if not os.path.isdir(args.input):
+        if not args.input or not os.path.isdir(args.input):
             logger.error(f"Input folder {args.input} does not exist")
             sys.exit(1)
         encrypt_folder(args.input, args.output, args.storage, args.key, args.noise)

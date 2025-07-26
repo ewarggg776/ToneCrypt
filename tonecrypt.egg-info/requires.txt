@@ -1,0 +1,7 @@
+colorama==0.4.6
+librosa==0.10.1
+numpy==1.24.4
+pydub==0.25.1
+reedsolo==1.7.0
+scipy==1.10.1
+soundfile==0.12.1
