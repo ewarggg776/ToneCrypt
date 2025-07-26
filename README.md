@@ -15,7 +15,6 @@
 - **Secure Key Derivation**: Uses SHA-256 to derive encryption parameters from a user-provided key.
 - **Error Correction**: Implements Reed-Solomon encoding for reliable data recovery.
 - **Interactive & CLI Modes**: Supports both interactive prompts and command-line arguments.
-- **Raspberry Pi Compatible**: Optimized for Raspberry Pi OS and other Linux distributions.
 
 ---
 
