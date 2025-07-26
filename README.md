@@ -20,7 +20,7 @@
 
 ## Installation
 
-### Option 1: Install via `.deb` Package (COMING SOON)
+### Option 1: Install via `.deb` Package 
 
 1. **Download the Package**:
    Download `tonecrypt_1.3-1.deb` from the [Releases](https://github.com/yourusername/tonecrypt/releases) page.
