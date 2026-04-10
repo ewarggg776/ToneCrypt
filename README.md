@@ -20,51 +20,28 @@
 
 ## Installation
 
-### Option 1: Install via `.deb` Package
+### Option 1: Quick Start (Recommended)
+Use a Python virtual environment to keep your system clean:
+```bash
+git clone https://github.com/ewarggg776/tonecrypt.git
+cd tonecrypt
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python3 ToneCrypt.py
+```
 
-1. **Build or Download the Package**:
-   - To build: see the section below on building the `.deb` package.
-   - Or download `tonecrypt_1.0-1.deb` from the [Releases](https://github.com/ewarggg776/tonecrypt/releases) page.
-
-2. **Install System Dependencies**:
+### Option 2: Install via `.deb` Package
+(Best for permanent system-wide usage)
+1. **Install System Dependencies**:
    ```bash
    sudo apt-get update
    sudo apt-get install python3 python3-pip libsndfile1 ffmpeg wodim cdparanoia alsa-utils
    ```
-
-3. **Install the Package**:
+2. **Build and Install**:
    ```bash
+   dpkg-deb --build tonecrypt_1.0-1
    sudo dpkg -i tonecrypt_1.0-1.deb
-   ```
-
-4. **Run ToneCrypt**:
-   ```bash
-   python3 /usr/local/bin/ToneCrypt.py
-   ```
-   (Or add a symlink to your PATH for convenience.)
-
-### Option 2: Install as a Python Package
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/ewarggg776/tonecrypt.git
-   cd tonecrypt
-   ```
-
-2. **Install System Dependencies**:
-   ```bash
-   sudo apt-get update
-   sudo apt-get install python3 python3-pip libsndfile1 ffmpeg wodim cdparanoia alsa-utils
-   ```
-
-3. **Install Python Dependencies**:
-   ```bash
-   pip3 install -r requirements.txt
-   ```
-
-4. **Run Directly**:
-   ```bash
-   python3 tonecrypt.py
    ```
 
 ---

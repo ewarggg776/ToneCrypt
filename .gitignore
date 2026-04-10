@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Build and Distribution
+dist/
+build/
+*.egg-info/
+deb_dist/
+tonecrypt_1.0-1.deb
+
+# Audio and Data (Test files)
+*.wav
+*.enc
+*.recovered_enc
+*.bin
+test_input_dir/
+test_restored*/
+restored_batch/
+test_batch*/
+storage/
+siiiiimooon145.txt
+simon145.txt
+test_message.txt
+
+# IDEs
+.vscode/
+.idea/
